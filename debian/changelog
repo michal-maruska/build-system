@@ -1,3 +1,10 @@
+mmc-build-system (4.41) unstable; urgency=medium
+
+  * release: -G can use post-tag-hook
+  * release: -G: show the workflow running
+
+ -- Michal Maruska <mmaruska@gmail.com>  Wed, 14 Oct 2026 19:46:21 +0200
+
 mmc-build-system (4.40) unstable; urgency=medium
 
   * ci: limit to amd64
