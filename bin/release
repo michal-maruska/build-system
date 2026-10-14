@@ -312,6 +312,9 @@ then
     post-tag-hook
     # git push github $tag
     # open in browser?
+    (set -x
+     gh workflow list
+    )
     exit 0
 fi
 
