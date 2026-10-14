@@ -309,7 +309,8 @@ then
     fi
 
     # remote name:
-    git push github $tag
+    post-tag-hook
+    # git push github $tag
     # open in browser?
     exit 0
 fi
