@@ -314,19 +314,20 @@ load_config()
     # which promises USer (X window connection is best)
 }
 
-
-# if the gpg agent does not answer anymore, start a new one, and source the SHELL values.
+# Verify gpg agent is responsive; start a new one if not
 check_start_gnupg()
 {
-    if ! gpg-connect-agent -q '/bye' || [ $(gpg-connect-agent '/echo  ahoj' '/bye') != "ahoj" ]
-    then
+    local gpg_response
+    gpg_response=$(gpg-connect-agent '/echo ahoj' '/bye' 2>/dev/null || true)
+
+    if ! gpg-connect-agent -q '/bye' 2>/dev/null || [[ "$gpg_response" != "ahoj" ]]; then
         cecho yellow "Have to restart gpg" >&2
         restart_gpg
         load_config
     fi
 
-    if gpg-connect-agent -q '/bye' || [ $(gpg-connect-agent '/echo  ahoj' '/bye') != "ahoj" ]
-    then
+    gpg_response=$(gpg-connect-agent '/echo ahoj' '/bye' 2>/dev/null || true)
+    if gpg-connect-agent -q '/bye' 2>/dev/null && [[ "$gpg_response" == "ahoj" ]]; then
         cecho green "gpg is ok on ${GPG_AGENT_INFO-}" >&2
     fi
 
