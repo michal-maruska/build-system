@@ -3,311 +3,221 @@
 # Common functions for the scripts
 info()
 {
-    cecho yellow $1 >&2
+    cecho yellow "$1" >&2
 }
 
 check_getopt()
 {
     if getopt -T; then # should test (( $? = -4 ))
-        echo "incompatible  getopt(1) installed. Abort"
-        exit -1
+        echo "incompatible getopt(1) installed. Abort" >&2
+        exit 1
     fi
 }
 
-# the hook betwen git-checkout & build.
+# The hook between git-checkout & build.
 prepare_hook_name()
 {
     # Support for 2 different versions of gbp:
-    local gbp_version=$(gbp buildpackage --version|cut --delimiter=' ' --fields=2)
+    local gbp_version
+    gbp_version=$(gbp buildpackage --version 2>/dev/null | cut --delimiter=' ' --fields=2)
 
-    if dpkg --compare-versions $gbp_version 'gt' 0.6; then
+    if [[ -n "$gbp_version" ]] && dpkg --compare-versions "$gbp_version" 'gt' 0.6; then
         PREVERSION_HOOK_NAME=--git-postexport
     else
         PREVERSION_HOOK_NAME=--git-prebuild
     fi
 }
 
-# set -x set inside a function does not work globally?
 possibly_trace()
 {
-    if [ -n "${DEBUG-}" ]; then
-        # cecho blue setting DEBUGGING on >&2
-        # setopt XTRACE
-        # unsetopt LOCAL_OPTIONS
+    if [[ -n "${DEBUG-}" && "${DEBUG-}" != "n" ]]; then
         echo "set -x"
     fi
 }
 
-
 # Keep only the 2-numbers NNN.MMMwhatever
 drop_verbal_suffix()
 {
-    # conditionally remove. but this
-    # should not remove a middle  a.b.c.
-    # 1.2ubuntu ->  1.2
-    if [[ $VERSION =~ "^([[:digit:]]+)\\.([[:digit:]]+)([^.[:digit:]].*)$" ]]
-       #                                                 ^??
-    then
-        if [ -n ${DEBUG-} ]; then
-            cecho red "drop_verbal_suffix: Discarding $match[3] from the $VERSION";
+    # conditionally remove, e.g. 1.2ubuntu -> 1.2
+    if [[ $VERSION =~ '^([[:digit:]]+)\.([[:digit:]]+)([^.[:digit:]].*)$' ]]; then
+        if [[ -n "${DEBUG-}" && "${DEBUG-}" != "n" ]]; then
+            cecho red "drop_verbal_suffix: Discarding $match[3] from $VERSION"
         fi
         VERSION="$match[1].$match[2]"
     fi
 }
 
-
-# I want to detect a current git tag on HEAD, to not recreate it.
-# return 1 if no such tag exists.
-# return 0 & set the following variables if successul:
-# VERSION
-# DISTRIBUTION
-# GIT_OFFSET
+# Detect a current git tag on HEAD to avoid recreating it.
+# Return 1 if no such tag exists.
+# Return 0 & set the following variables if successful:
+# VERSION, DISTRIBUTION, GIT_OFFSET
 get_current_tag()
 {
-    if ! description=$(git describe --tags)
-    then
-        # are there any tags at all:
-        if git tag -l |grep . > /dev/null;
-        then
-            cecho red "not _past_ Git tag. But other tags present"
-            # fixme:
-            if [ $FORCE != "y" ] # ???
-            then
+    local description
+    if ! description=$(git describe --tags 2>/dev/null); then
+        # Are there any tags at all:
+        if git tag -l | grep -q .; then
+            cecho red "not past Git tag, but other tags present"
+            if [[ "${FORCE-n}" != "y" ]]; then
                 exit 1
             fi
         else
-            # fake values.
             VERSION=
             DISTRIBUTION=
-            # GIT_OFFSET=$match[3]
             return 1
         fi
     else
-
         # 2 possibilities:
         # Either only the tag (possibly name/version),
-        # or name/version-offset-g{hash} eg.  release|debian/3.4-2568-g59abc
-        if [[ $description =~ "^(.*)/(.*)-([[:digit:]]+)-g[[:alnum:]]*$" ]]
-        then
+        # or name/version-offset-g{hash} eg. release|debian/3.4-2568-g59abc
+        if [[ $description =~ '^([^/]+)/(.*)-([[:digit:]]+)-g[[:alnum:]]*$' ]]; then
             DISTRIBUTION=$match[1]
             VERSION=$match[2]
             GIT_OFFSET=$match[3]
-            # ${${description%-g*}#*-}
-
-        elif [[ $description =~ "^(.*)/(.*)$" ]]
-        then
+        elif [[ $description =~ '^([^/]+)/(.*)$' ]]; then
             DISTRIBUTION=$match[1]
             VERSION=$match[2]
-            #VERSION=${description#*/}
-            #DISTRIBUTION=${description%/*}
         else
             echo "Found a non-release git tag: $description. So ignoring it." >&2
             return 1
         fi
     fi
 
-    if [ -n "${DEBUG-}" ]; then
+    if [[ -n "${DEBUG-}" && "${DEBUG-}" != "n" ]]; then
         cecho yellow "version: $VERSION git-offset: ${GIT_OFFSET:-} distro: $DISTRIBUTION" >&2
     fi
 }
 
-
-# decide, whether debian/changelog needs a new `section'
-# todo: in-place if "git status" says clean
-# keep changelog out:
-# create it in a hook!
-
-# for release: --git-builder /usr/bin/git-pbuilder
-# dubious:
-# todo: but, maybe it WAS committed in the last commit & nothing has changed!
-
-# Return 0 iff last Changelog item is not commited?
-# ENV: $FORCE
-changelog_needs_new_section() {
-    type=$1
+# Decide whether debian/changelog needs a new section
+# Return 0 iff changelog needs updating
+changelog_needs_new_section()
+{
+    local type=$1
     local FILE="debian/changelog"
 
-    if [[ ${FORCE-n} = "y" ]]; then
+    if [[ "${FORCE-n}" == "y" ]]; then
         return 0
-    elif git status --porcelain $FILE |grep --silent '^ M'; then
-        # it's modified already.
+    elif git status --porcelain "$FILE" 2>/dev/null | grep -q '^ M'; then
+        # It's modified already.
         cecho yellow "$FILE is dirty"
-        # mmc: for release this is 0, for snap it's 1....
-        if [ $type = "release" ]; then
-            return 0;
+        if [[ "$type" == "release" ]]; then
+            return 0
         else
-            return 1;
+            return 1
         fi
-    elif [ $(git log --pretty=%P -n 1 |wc -w) -gt 1 ]
-    then
-        cecho yellow "$FILE is clean but now we Merged and merge commits need specia attention"
+    elif [[ $(git log --pretty=%P -n 1 2>/dev/null | wc -w) -gt 1 ]]; then
+        cecho yellow "$FILE is clean but now we merged and merge commits need special attention"
         return 0
-
-    elif ! git diff HEAD~1 --name-status $FILE | grep '^[AM]' > /dev/null
-    then
+    elif ! git rev-parse --verify HEAD~1 >/dev/null 2>&1 || ! git diff HEAD~1 --name-status "$FILE" 2>/dev/null | grep -q '^[AM]'; then
         cecho yellow "$FILE was not updated during the last commit"
         return 0
-
-    elif git status --porcelain  |grep --silent '^ M'; then
-        # fixme!  something changed, (but _not_ debian/changelog)
+    elif git status --porcelain 2>/dev/null | grep -q '^ M'; then
+        # Something changed, but not debian/changelog
         return 1
-    elif git diff --name-only HEAD~1 | grep $FILE; then
-        # so nothing changed, was it changed in the previous commit?
-        return 1;
+    elif git diff --name-only HEAD~1 2>/dev/null | grep -q "$FILE"; then
+        return 1
     else
         return 0
     fi
 }
 
-
-# Note: maybe a comitted debian/changelog has a higher
-# version n. which was not released with a tag.
-
-# Increase the VERSION, and compare with the one in debian/changelog.
-# Make sure it's bigger than that.
-# private/static
-function _get_new_version()
+# Increase VERSION and compare with the one in debian/changelog.
+_get_new_version()
 {
     local step=$1
 
-    increase_version -r $step
+    increase_version -r "$step"
     local git_version=$VERSION
-    # git_distro=$DISTRIBUTION
 
-    # fixme: why? increase_version only rewrote VERSION!
-
-    # This should be from
-    # (sets DISTRIBUTION, VERSION)
     load_distr_version_from_changelog
-    # drop_verbal_suffix
 
-    if dpkg --compare-versions $VERSION lt $git_version;
-    then
-        # so this is expected, and here we `return' to the calculated VERSION value.
-        # not very nice.
-        # increase_version $step
+    if dpkg --compare-versions "$VERSION" lt "$git_version"; then
         VERSION=$git_version
-        # so the changelog contains a higher
-        # version. git-dch would notice it.
-        #
-        # So, increase more.
     fi
 
     info "new version is $DISTRIBUTION $VERSION"
 }
 
-
-function git_reset_changelog()
+git_reset_changelog()
 {
     local FILE=debian/changelog
-    # todo: if modified, reset it. Saving a copy.
-    # that copy will be then removed, at the end.
-    # This, because snap creates sections, which
-    # we don't want here.
-    if git status --porcelain $FILE| grep '^[M ]M' > /dev/null;
-    then
-        mv $FILE $FILE.pre-release
-        git checkout $FILE
+    if git status --porcelain "$FILE" 2>/dev/null | grep -q '^[M ]M'; then
+        mv "$FILE" "$FILE.pre-release"
+        git checkout "$FILE"
     fi
 }
 
-# That obviously implies the Git-Tag, then, on the new commit.
+# Generate changelog entry and commit it.
 # input: USER_VERSION, USER_DISTRIBUTION, DCH_OPTIONS
-# modifies/output: VERSION, DISTRIBUTION,
-# usage: f increase_step
-function generate_commit_changelog()
+# modifies/output: VERSION, DISTRIBUTION
+generate_commit_changelog()
 {
     local opts=()
-    if [[ $1 = "-q" ]] then
-       opts+=(--spawn-editor=never)
-       shift
+    if [[ "$1" == "-q" ]]; then
+        opts+=(--spawn-editor=never)
+        shift
     fi
 
     local step=$1
-    if [ -n "${USER_VERSION:-}" ]
-    then
+    if [[ -n "${USER_VERSION:-}" ]]; then
         echo "overriding the version, as requested" >&2
         VERSION=${USER_VERSION}
     else
-        # fixme: here we need to increase (& hence parse) the VERSION:
-        _get_new_version $step
-        #echo "Starting a new version $VERSION."
-        #echo "Could have been explicitely specified with the -v option.">&2
-        # no need to echo... the user will see it?
+        _get_new_version "$step"
     fi
 
-    [[ -n $USER_DISTRIBUTION ]] && DISTRIBUTION=$USER_DISTRIBUTION
+    [[ -n "$USER_DISTRIBUTION" ]] && DISTRIBUTION=$USER_DISTRIBUTION
 
-    set -x
+    eval $(possibly_trace)
     git_reset_changelog
 
-    local gbp_version=$(gbp buildpackage --version|cut -d ' '  -f 2)
-    if dpkg --compare-versions $gbp_version gt 0.6; then
-        # old did not support it.
-        if [ -n "$DISTRIBUTION" ]; then
-            DCH_OPTIONS+=(--distribution $DISTRIBUTION)
+    local gbp_version
+    gbp_version=$(gbp buildpackage --version 2>/dev/null | cut -d ' ' -f 2)
+    if [[ -n "$gbp_version" ]] && dpkg --compare-versions "$gbp_version" gt 0.6; then
+        if [[ -n "$DISTRIBUTION" ]]; then
+            DCH_OPTIONS+=(--distribution "$DISTRIBUTION")
         fi
     fi
 
-    # todo: this function should take option to suppress the editor:
-    gbp dch $DCH_OPTIONS --release --auto --new-version="$VERSION" $opts --spawn-editor=never
+    gbp dch "${DCH_OPTIONS[@]}" --release --auto --new-version="$VERSION" "${opts[@]}" --spawn-editor=never
 
-    # Do the commit:
-
-    # fixme: part of git_reset_changelog !
     rm -f debian/changelog.pre-release
-    set +x
-    if git status --porcelain debian/changelog| grep '^[M ]M' > /dev/null;
-    then
-        git add debian/changelog;
-        # todo: "release $VERSION"
+    if git status --porcelain debian/changelog 2>/dev/null | grep -q '^[M ]M'; then
+        git add debian/changelog
         git commit -m "release"
         GITSHA=$(git rev-list --max-count=1 HEAD)
-    # else what to do?
     fi
 }
 
-# Using external tools, parse "debian/changelog"
+# Using external tools, parse debian/changelog
 # and set: DISTRIBUTION, VERSION
 load_distr_version_from_changelog()
 {
     local FILE="debian/changelog"
-    DISTRIBUTION=$(deb-pkg-distribution $FILE)
-    VERSION=$(deb-pkg-version $FILE)
+    DISTRIBUTION=$(deb-pkg-distribution "$FILE")
+    VERSION=$(deb-pkg-version "$FILE")
 }
 
-
-# If the author of previous release was not me, just add the suffix "maruska",
+# Check if the author/maintainer matches
 my_own_project()
 {
-    expr match "$(deb-pkg-maintainer debian/control)" ".*maruska.*" >/dev/null
+    [[ $(deb-pkg-maintainer debian/control 2>/dev/null) == *maruska* ]]
 }
 
-
-# rewrites the $VERSION variable:
-# increase the first of last numeric value.
-
-# fixme: why does `release' use generate_commit_changelog while snap increase_version?
-# generate_commit_changelog -> _get_new_version -> increase_version
+# Increase the VERSION variable
 increase_version()
 {
     local release="n"
-    if [[ $1 = "-r" ]]; then
+    if [[ "$1" == "-r" ]]; then
         release=y
         shift
     fi
 
     local step=$1
-    set -x
-    # fixme: it can be: (from git)
-    # a.b.c~git-offset
 
-    # this is for release!
-    if [[ $release = y ]] && my_own_project; then
-        # after a snapshot version: x.y.z~snapshot
-        # just drop the ~suffix:
-        if [[ $VERSION =~ "(.*)~.*$" ]]
-        then
+    # After a snapshot version: x.y.z~snapshot, drop the ~suffix on release
+    if [[ "$release" == "y" ]] && my_own_project; then
+        if [[ $VERSION =~ '^(.*)~.*$' ]]; then
             VERSION="$match[1]"
             return
         fi
@@ -420,5 +330,6 @@ check_start_gnupg()
         cecho green "gpg is ok on ${GPG_AGENT_INFO-}" >&2
     fi
 
-    export GPG_TTY=$(tty)
+    export GPG_TTY=$(tty 2>/dev/null || true)
 }
+
