@@ -51,6 +51,7 @@ Build environment:
 -r, --distro [distro]		package for that distribution (default host one), ignore debian/changelog?
 -a, --arch   architecture       default Host.
 
+-D --debug  invoke shell at the end of the build
 EOF
     unsetopt POSIX_ARGZERO
 }
@@ -107,9 +108,9 @@ just_push_to_github=0
 
 # must be in the same order? no!
 cmd_options=$(getopt --name $0 --shell bash \
-    --longoptions help,arch,dput,ignore,install,noinstall,tag,version:,nocheck \
+    --longoptions help,arch,dput,debug,ignore,install,noinstall,tag,version:,nocheck \
     --longoptions force,quiet,source,distro:,minor,major,github \
-    --options ha:bfGr:T:p:qiIv:ousmM \
+    --options ha:bDfGr:T:p:qiIv:ousmM \
     -- "$@" ) || { usage && exit 1 }
 eval set -- "$cmd_options"
 
@@ -136,6 +137,9 @@ while (( $# > 0 )) do
           --dput | -p)
               shift
               dput_targets+=($1)
+              ;;
+          --debug | -D)
+              stay_in_shell_after_failure=1
               ;;
           --github | -G )
               just_push_to_github=1
@@ -275,10 +279,18 @@ calculate_for_distro()
 
     # output:
 
+    local interactive=""
+    if [[ ${stay_in_shell_after_failure-0} == 1 ]]
+    then
+        interactive="--interact"
+    fi
     # DCH_OPTIONS+=("--git-dist=$USER_DISTRIBUTION")
 
     # note: all this is one argument!
-    GBP_OPTIONS+=("--git-builder=debspawn --config $debspawn_config_toml build --only binary --buildflags=-b $distribution --setenv GITSHA=$GITSHA --setenv MAKEFLAGS=$MAKEFLAGS")
+    # how to make it interactive ?
+    # --interact
+    GBP_OPTIONS+=("--git-builder=debspawn --config $debspawn_config_toml build $interactive --only binary --buildflags=-b $distribution --setenv GITSHA=$GITSHA")
+    #--setenv MAKEFLAGS=$MAKEFLAGS
     artifacts_dir=/gbp/$distribution
 }
 
