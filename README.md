@@ -1,12 +1,21 @@
-* Todo:
+### This is the tool to trigger build of debian package from sourcetree.
 
 
-** `snap' cares about tarbal !
+It can use local debspawn tool to build in minimal environment with build-dependencies,
+or it can just upload to Github, create d/changelog, git tag.
+
+
+
+
+#### Todo:
+
+
+* `snaprel' cares about tarbal !
 gbp:info: Orig tarball 'gauche_0.9.4.orig.tar.gz' not found at '../tarballs/'
 -> only matter of #tarball-dir = ../tarballs/ in ~/.gbp.conf
 
 
-* Relevant Variables (for your env)
+### Relevant Variables (for your env)
 M Build system:
 
 REPREPRO_BASE_DIR
@@ -16,7 +25,7 @@ MBS_DISTRO
 
 
 
-* Background:
+### Background:
 
 git-dch passes (not a simple mapping) only *some* params to
 debchange/dch.
@@ -30,9 +39,9 @@ build on top of that (again in Perl, I'm sorry).
 
 
 
-* Features
+### Features
 
-*** snap
+##### snaprel -- build snapshot
 
 ** When making a package (source or preparing for compilation)
 I want to generate all the "autoconf" generated files.
@@ -47,16 +56,15 @@ So the debian/changelog is not submitted, but still changed.
 git-buildpackage does not do that out-of-box. a pre-build hook is
 necessary.
 
-
-*** release
+##### release -- build real versioned package
 
 ** I want an option to switch to git-builder.  todo!
 ** I want to dictate the Distro name on command line.  how?
 
 
 
-* History
-** First I had my PPA on lauchpad
+### History
+#### First I had my PPA on lauchpad
 
 ** git-buildpackage ... I had a recipe, and pasted on Zsh command line.
 
@@ -106,7 +114,7 @@ dunno!
 
 
 
-* Building for x32 !
+##### Building for x32 !
 ** how to build ... inside container?
 #    $TAGOPTIONS \
 # todo:
@@ -131,6 +139,7 @@ debuild  (reads ~/.devscripts) --preserve-envvar
 DEBUILD_DPKG_BUILDPACKAGE_OPTS
 
 
+##### Building on multiple hosts for a shared "reprepro"
 
 File "pool/main/libx/libx11/libx11-doc_1.6.7-1-maruska_all.deb" is already registered with different checksums!
 md5 expected: 345e8ad985066e873c67e0f72f12645a, got: 94f9200ed3d8e0b1129159ffca162e79
