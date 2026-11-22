@@ -31,7 +31,12 @@ release_push() {
     print
     git config release.remote "$remote"
     git config release.branch "$branch"
+
   fi
+
+  # keep casual fetches away from the guarded ref (idempotent)
+  git config --get-all "remote.${remote}.fetch" | grep -qxF "^refs/heads/${branch}" \
+      || git config --add "remote.${remote}.fetch" "^refs/heads/${branch}"
 
   # We force --- because we probably have `tip' not descendant, but, we
   # do _controlled_ steps:
