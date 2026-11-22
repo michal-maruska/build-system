@@ -1,24 +1,67 @@
-#! /bin/bash -eu
+#! /usr/bin/zsh -feu
 
-# Git-push to ...$CENTRALREPO
+# todo:
+
+# git config release.remote
+# git config release.branch
+
+# push --force only if my-local-base  is the same as the remote main.
+# with-lease:
+# force=(--force-with-lease=refs/heads/$branch:$(git rev-parse $ref))
+
+# git reflog github/main
+
+# git config list  --local
+
+release_push() {
+  local tip=${1:-HEAD}
+  local remote=$(git config release.remote)
+  local branch=$(git config release.branch)
+
+  if [[ -z $remote || -z $branch ]]; then
+    if git remote | grep -qx github; then
+      remote=github
+    elif [[ $(git remote | wc -l) -eq 1 ]]; then
+      remote=$(git remote)
+    else
+      print -u2 "set release.remote (several remotes, none named github)"; return 1
+    fi
+    branch=main
+    read -q "?Release to ${remote}/${branch}; history may be rewritten? [y/N] " || { print; return 1 }
+    print
+    git config release.remote "$remote"
+    git config release.branch "$branch"
+  fi
+
+  # We force --- because we probably have `tip' not descendant, but, we
+  # do _controlled_ steps:
+  local expect=$(git rev-parse -q --verify "refs/remotes/${remote}/${branch}")
+  ( set -x
+  git push --force-with-lease="refs/heads/${branch}:${expect}" \
+      "$remote" "${tip}:refs/heads/${branch}"
+  )
+}
 
 # This can be run manually inside the (git) source tree.
-: ${GBP_TAG=$(git describe --tags)}
-: ${GBP_BRANCH=$(git branch --show-current)}
-
+: "${GBP_TAG:=$(git describe --tags 2>/dev/null || true)}"
+: "${GBP_BRANCH:=$(git branch --show-current 2>/dev/null || true)}"
 
 possibly_push_into()
 {
-    remote=$1
-    if git remote get-url $remote; then
-        git push $remote $GBP_TAG || echo "'git push' failed for the tag $GBP_TAG"
-        git push $remote $GBP_BRANCH || echo "'git push' failed for the branch $GBP_BRANCH"
+    local remote=$1
+    if git remote get-url "$remote" >/dev/null 2>&1; then
+        if [ -n "$GBP_TAG" ]; then
+            git push "$remote" "$GBP_TAG" || echo "'git push' failed for tag $GBP_TAG" >&2
+        fi
+        if [ -n "$GBP_BRANCH" ]; then
+            git push "$remote" "$GBP_BRANCH" || echo "'git push' failed for branch $GBP_BRANCH" >&2
+        fi
     fi
 }
 
-
-possibly_push_into "maruska"
-possibly_push_into "origin"
+# possibly_push_into "maruska"
 possibly_push_into "github"
+# only if others don't exist:
+# possibly_push_into "origin"
 
-#GBP_SHA1
+release_push
