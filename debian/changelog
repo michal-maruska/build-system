@@ -1,3 +1,18 @@
+mmc-build-system (4.42) unstable; urgency=medium
+
+  * functions: ai improvement (style)
+  * functions: ai improvement on gpg restarting
+  * functions: ai more improvement on gpg daemon restart
+  * post-tag-hook: push into the branch, release.remote/release.branch
+  * release: --debug -D option to stay inside the debspawn'ed container
+  * github: list the jobs after pushing
+  * release: store the git-hierarchy into the tag
+  * drop the MAKEFLAGS
+  * post-tag-hook: avoid fetching the release.branch by bulk fetch actions
+  * deb-pkg-find-changes: have AI clean it up
+
+ -- Michal Maruska <mmaruska@gmail.com>  Sun, 22 Nov 2026 19:29:06 +0100
+
 mmc-build-system (4.41) unstable; urgency=medium
 
   * release: -G can use post-tag-hook
