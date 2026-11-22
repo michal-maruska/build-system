@@ -67,7 +67,7 @@ DCH_OPTIONS=()
 
 
 # I have special make
-DEBUILD_OPTIONS+=(-eMAKEFLAGS -eGITSHA)
+DEBUILD_OPTIONS+=(-eGITSHA)
 
 DEBUG=y
 
