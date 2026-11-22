@@ -313,7 +313,11 @@ then
         else
             # todo: the whole graph or from the current branch?
             # fixme:  sid/ not unstable/ ?
-            git-store-hierarchy -t $tag $(git rev-parse HEAD)
+
+            git-store-hierarchy --tag $tag \
+                                --message "$tag" \
+                                --commit HEAD \
+                                $(git rev-parse HEAD)
             # git branch --show-current
             ## git-store-hierarchy -t unstable/1.31.2-1-maruska mmc-all
 
