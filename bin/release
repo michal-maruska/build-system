@@ -150,7 +150,7 @@ while (( $# > 0 )) do
               ;;
           --tag | -T )
               shift
-              git_tag=$1
+              git_tag=$1 # fixme: used?
               ;;
           --source | -s)
               # still  dpkg-buildpackage will call dpkg-source --before-build
@@ -184,6 +184,7 @@ while (( $# > 0 )) do
               ;;
           --version | -v)
               shift
+              # this variable is picked up in ../share/functions.sh
               USER_VERSION=$1
               ;;
           -u)
@@ -260,6 +261,7 @@ then
 
     # invokes: gbp dch
     if [[ $QUIET == y ]]; then
+        # uses DCH_OPTIONS
         generate_commit_changelog -q $step
     else
         generate_commit_changelog  $step
@@ -276,9 +278,7 @@ calculate_for_distro()
     local distribution=$1
 
     local debspawn_config_toml=~/config/debspawn/debspawn-$distribution.toml
-
     # output:
-
     local interactive=""
     if [[ ${stay_in_shell_after_failure-0} == 1 ]]
     then
@@ -295,6 +295,7 @@ calculate_for_distro()
 }
 
 
+# new:
 if [[ $just_push_to_github == 1 ]]
 then
     # update/reload:
@@ -372,7 +373,7 @@ version=$(deb-pkg-version debian/changelog)
 host_architecture=$(dpkg-architecture -q DEB_HOST_ARCH)
 
 
-## What do do with the artifacts:
+## What do do with the artifacts -- calculate POSTBUILD
 # fixme:
 version=${version#*:}
 changesfile="$artifacts_dir/${name}_${version}_${host_architecture}.changes"
@@ -393,6 +394,7 @@ then
 else
     POSTBUILD="dput-install -r $POSTBUILD_INSTALL_OPTIONS $changesfile"
 fi
+
 
 # -sa dpkg-genchanges: force inclusion of original sources (in the changes file)
 
