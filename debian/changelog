@@ -1,3 +1,11 @@
+mmc-build-system (4.43) unstable; urgency=medium
+
+  * update README.md
+  * post-tag-hook: don't push random branch (GBP_BRANCH)
+  * comments & spaces
+
+ -- Michal Maruska <mmaruska@gmail.com>  Thu, 26 Nov 2026 22:21:25 +0100
+
 mmc-build-system (4.42) unstable; urgency=medium
 
   * functions: ai improvement (style)
