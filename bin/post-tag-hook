@@ -59,7 +59,7 @@ possibly_push_into()
             git push "$remote" "$GBP_TAG" || echo "'git push' failed for tag $GBP_TAG" >&2
         fi
         if [ -n "$GBP_BRANCH" ]; then
-            git push "$remote" "$GBP_BRANCH" || echo "'git push' failed for branch $GBP_BRANCH" >&2
+            echo "not pushing random branch"
         fi
     fi
 }
